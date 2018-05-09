@@ -6,7 +6,7 @@ Distant supervision algorithms with neural network.
 ## Training
 To train the deep-distant supervision model, try
 
-`python main.py --is_train=True --num_hidden=256 --data_set=data/nyt --num_poch=3 --save_gap=1000 --print_gap=100`
+`python main.py --is_train=True --num_hidden=256 --data_set=data/nyt --num_epoch=3 --save_gap=1000 --print_gap=100`
 
 Examples of some configurable model parameters are:
 - `word_attn`: boolean, whether to use word-level attention layer
