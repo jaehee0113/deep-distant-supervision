@@ -40,6 +40,8 @@ flags.DEFINE_string('dataset', 'data/nyt', 'path to the dataset')
 flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
 flags.DEFINE_integer('save_gap', 1000, 'Save model every save_gap iteration to save_path')
 flags.DEFINE_boolean('train_validation', True, 'If true, training includes validation as well')
+flags.DEFINE_boolean('use_multiplier', True, 'If true, multiplier will be used in the sentence-level attention layer.')
+flags.DEFINE_string('filter_sizes', '[3,4,5]', 'For cnn, this is the size of filters to be applied')
 
 # Testing
 flags.DEFINE_integer('test_step', -1, 'Specify trained model by global step, if -1 use the latest checkpoint')
