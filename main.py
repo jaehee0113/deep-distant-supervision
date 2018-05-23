@@ -14,7 +14,7 @@ flags = tf.app.flags
 flags.DEFINE_boolean('word_attn', True, 'Whether to use word-level attention')
 flags.DEFINE_boolean('sent_attn', True, 'Whether to use sentence-level attention')
 flags.DEFINE_integer('num_hidden', 230, 'The number of hidden unit')
-flags.DEFINE_integer('num_filter', 32, 'The number of filter in cnn (if network_type=cnn)')
+flags.DEFINE_integer('num_filters', 32, 'The number of filter in cnn (if network_type=cnn)')
 flags.DEFINE_integer('pos_dim', 5, 'The dimensionality of position embedding')
 flags.DEFINE_boolean('bidirectional', True, 'Whether to define bidirectional rnn')
 flags.DEFINE_integer('num_relation', 53, 'The number of relations to be classified')
@@ -29,7 +29,7 @@ flags.DEFINE_string('network_type', 'rnn', 'Model type [rnn, cnn]')
 # Training
 flags.DEFINE_boolean('is_train', True, 'Whether to do training or testing')
 flags.DEFINE_boolean('load_prev', True, 'Restore previously trained model if True')
-flags.DEFINE_integer('batch_size', 48,
+flags.DEFINE_integer('batch_size', 4,
                      'The size of batch for minibatch training (number of triples to be mini-batched)')
 flags.DEFINE_boolean('pretrained_w2v', True,
                      'Use pretrained word2vec if True, note that the word id should be aligned with the word2vec id')
@@ -41,7 +41,7 @@ flags.DEFINE_integer('print_gap', 50, 'Print status every print_gap iteration')
 flags.DEFINE_integer('save_gap', 1000, 'Save model every save_gap iteration to save_path')
 flags.DEFINE_boolean('train_validation', True, 'If true, training includes validation as well')
 flags.DEFINE_boolean('use_multiplier', True, 'If true, multiplier will be used in the sentence-level attention layer.')
-flags.DEFINE_string('filter_sizes', '[3,4,5]', 'For cnn, this is the size of filters to be applied')
+#flags.DEFINE_string('filter_sizes', '[3,4,5]', 'For cnn, this is the size of filters to be applied')
 
 # Testing
 flags.DEFINE_integer('test_step', -1, 'Specify trained model by global step, if -1 use the latest checkpoint')
@@ -232,7 +232,7 @@ def main(_):
 
     save_path = get_model_dir(conf, exclude_list)
     if conf.save_path != '':
-        save_path = conf.save_path
+        save_path = conf.save_path + "/"
     logger.info("Model path {}".format(save_path))
 
     if conf.is_train and conf.train_validation:

@@ -23,7 +23,7 @@ class NRE:
 
         # CNN-specific config settings
         num_filters = conf.num_filters
-        filter_sizes = eval(conf.filter_sizes)
+        filter_sizes = [2,3,4]
         word_embedding_dim = 50 #subject to change
 
         # Note that the first dimension of input_sentence and input_y are different because each row in input_y is per
@@ -38,13 +38,14 @@ class NRE:
 
         num_sentences = self.input_triple_index[-1]
 
-        if pretrained_w2v:
-            self.word2vec = tf.get_variable(initializer=pre_word2vec, name="word_embedding")
-        else:
-            self.word2vec = tf.get_variable(shape=[conf.voca_size, conf.word_embedding_dim], name="word_embedding")
+        with tf.device('/gpu:1'):
+            if pretrained_w2v:
+                self.word2vec = tf.get_variable(initializer=pre_word2vec, name="word_embedding")
+            else:
+                self.word2vec = tf.get_variable(shape=[conf.voca_size, conf.word_embedding_dim], name="word_embedding")
 
-        self.pos2vec1 = tf.get_variable(shape=[max_position, pos_dim], name="pos2vec1")
-        self.pos2vec2 = tf.get_variable(shape=[max_position, pos_dim], name="pos2vec2")
+            self.pos2vec1 = tf.get_variable(shape=[max_position, pos_dim], name="pos2vec1")
+            self.pos2vec2 = tf.get_variable(shape=[max_position, pos_dim], name="pos2vec2")
 
         # concatenate word embedding + position embeddings
         # input_forward.shape = [num_sentence, len_sentence, w2v_dim+2*conf.pos_dim]
@@ -53,43 +54,47 @@ class NRE:
                                    tf.nn.embedding_lookup(self.pos2vec2, self.input_pos2)], 2)
 
         if network_type == 'cnn':
-            input_forward = tf.unstack(input_forward, len_sentence, 1)
-            input_forward = tf.expand_dims(input_forward, -1) #as conv2d expects 4 rank input
-            pooled_outputs = []
-            for i, filter_size in enumerate(filter_sizes):
-                with tf.name_scope("conv-maxpool-%s" % filter_size):
-                    filter_shape = [filter_size, word_embedding_dim, 1, num_filters]
-                    W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
-                    b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name="b")
+            with tf.device('/gpu:1'):
+                #input_forward = tf.unstack(input_forward, len_sentence, 1)
+                input_forward = tf.expand_dims(input_forward, -1) #as conv2d expects 4 rank input
+                pooled_outputs = []
+                for i, filter_size in enumerate(filter_sizes):
+                    with tf.name_scope("conv-maxpool-%s" % filter_size):
+                        filter_shape = [filter_size, word_embedding_dim, 1, num_filters]
+                        W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.1), name="W")
+                        b = tf.Variable(tf.constant(0.1, shape=[num_filters]), name="b")
 
-                    #Convolution layer
-                    conv = tf.nn.conv2d(
-                        input_forward,
-                        W,
-                        strides=[1,1,1,1],
-                        padding="SAME",
-                        name="conv")
+                        #Convolution layer
+                        conv = tf.nn.conv2d(
+                            input_forward,
+                            W,
+                            strides=[1,1,1,1],
+                            padding="SAME",
+                            name="conv")
 
-                    #Activation function (ReLu) layer
-                    nl = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
+                        #Activation function (ReLu) layer
+                        nl = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
 
-                    #Max-pooling layer
-                    pooled = tf.nn.max_pool(
-                        nl,
-                        ksize= [1, len_sentence - filter_size +1, 1, 1],
-                        strides=[1,1,1,1],
-                        padding="SAME",
-                        name="pool")
+                        #Max-pooling layer
+                        pooled = tf.nn.max_pool(
+                            nl,
+                            ksize= [1, len_sentence - filter_size +1, 1, 1],
+                            strides=[1,1,1,1],
+                            padding="SAME",
+                            name="pool")
 
-                    pooled_outputs.append(pooled)
-            # Combine all pooled features
-            num_filters_total = num_filters * len(filter_sizes)
-            self.pool = tf.concat(pooled_outputs, 3)
+                        pooled_outputs.append(pooled)
+                # Combine all pooled features
+                num_filters_total = num_filters * len(filter_sizes)
+                self.pool = tf.concat(pooled_outputs, 3)
 
-            # m dim : input forward (?)
-            sentence_embedding = tf.reshape(self.pool, [-1, num_filters_total])
-            num_hidden = 96 #(sentence_embedding n dimension)
-        elif network_type = 'rnn':
+                # m dim : input forward (?)
+                sentence_embedding = tf.reshape(self.pool, [-1, num_filters_total])
+                sentence_embedding = tf.nn.dropout(sentence_embedding, 0.5)
+                #num_hidden = 16 #(sentence_embedding n dimension)
+                h_sentence = sentence_embedding
+                num_hidden = num_filters_total
+        elif network_type == 'rnn':
             with tf.variable_scope("RNN"):
                 def create_rnn_cells(num_units):
                     """return list of rnn cells"""
@@ -132,11 +137,11 @@ class NRE:
                     else:
                         sentence_embedding = tf.reduce_mean(output_hidden, 1)
 
-        with tf.variable_scope("fc-hidden"):
-            h_sentence = tf.layers.dense(sentence_embedding, num_hidden, activation=activate_fn, name='fc-hidden')
+            with tf.variable_scope("fc-hidden"):
+                h_sentence = tf.layers.dense(sentence_embedding, num_hidden, activation=activate_fn, name='fc-hidden')
 
         # sentence-level attention layer, represent a triple as a weighted sum of sentences
-        with tf.variable_scope("sentence-attn"):
+        with tf.device('/gpu:1'), tf.variable_scope("sentence-attn"):
             attn_weight = tf.get_variable("W", shape=[num_hidden, 1])
             if conf.use_multiplier:
                 multiplier = tf.get_variable("A", shape=[num_hidden])
